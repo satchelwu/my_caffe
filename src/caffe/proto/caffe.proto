@@ -241,6 +241,9 @@ message SolverParameter {
 
   // Overlap compute and communication for data parallel training
   optional bool layer_wise_reduce = 41 [default = true];
+  
+  // gan added
+  optional bool gan_solver = 43 [default = false];
 }
 
 // A message that stores the solver snapshots
@@ -308,7 +311,7 @@ message ParamSpec {
 // NOTE
 // Update the next available ID when you add a new LayerParameter field.
 //
-// LayerParameter next available layer-specific ID: 147 (last added: recurrent_param)
+// LayerParameter next available layer-specific ID: 154 (last added: gan_loss_param)
 message LayerParameter {
   optional string name = 1; // the layer name
   optional string type = 2; // the layer type
@@ -405,6 +408,88 @@ message LayerParameter {
   optional ThresholdParameter threshold_param = 128;
   optional TileParameter tile_param = 138;
   optional WindowDataParameter window_data_param = 129;
+
+  // gan added
+  optional RandVecParameter rand_vec_param = 152;
+  optional GANLossParameter gan_loss_param = 153; // used by GAN loss & GANDG loss
+
+  
+  // compression CNN added
+  optional RoundParameter round_param = 147;
+  optional ImpMapParameter imp_map_param = 148;
+  optional DtowParameter dtow_param = 149;
+
+  optional EntropyPackParameter entropy_pack_param = 150;
+  optional SSIMLossParameter ssim_loss_param = 151;
+
+}
+
+// gan added
+message GANLossParameter {
+  optional uint32 dis_mod = 1 [default = 1];
+  optional uint32 gen_mod = 2 [default = 1];
+}
+
+message RandVecParameter {
+  optional uint32 batch_size = 1 [default = 1]; // NCHW
+  optional uint32 channel = 2 [default = 100];
+  optional uint32 height = 6[default = 0];
+  optional uint32 width = 7[default = 0];
+  optional float lower = 3 [default = -1]; // generate from [lower, upper) range 
+  optional float upper = 4 [default = 1];
+  optional uint32 repeat = 5 [default = 1]; // every 'repeat' iters to generate a new random blob
+}
+
+// cCNN added
+message SSIMLossParameter {
+  optional uint32 kernel_size = 1 [default = 8]; // The kernel size (square)
+  optional uint32 stride = 2 [default = 8]; // The stride (equal in Y, X)
+  optional float  c1 = 3 [default = 0.00001]; // C1 
+  optional float  c2 = 4 [default = 0.00001]; // C2
+}
+
+message EntropyPackParameter {
+	optional uint32 kernel = 1[default=5];
+	optional uint32 channels = 2 [default=8];
+	optional uint32 samples = 3 [default=4];
+}
+
+message RoundParameter {
+	enum RoundMethod{
+		ZERO_ONE = 0;
+		ONE_MINUS_ONE=1;
+		MULTI=2;
+	}
+	
+	optional float scale = 1 [default = 1.0];
+	optional uint32 groups = 3 [default = 4];
+	optional RoundMethod method = 2 [default = ZERO_ONE];
+	optional bool has_constrain = 4 [default = false];
+	optional float ratio = 5 [default = 1.0];
+}
+
+message ImpMapParameter {
+	enum ImpMethod{
+		GLOBAL = 0;
+		LOCAL = 1;
+	}
+	optional ImpMethod method = 1 [default=LOCAL];
+	optional bool lquantize = 8 [default=true];
+	repeated float ratio = 2;
+	optional uint32 groups = 3 [default=4];
+	optional float cmp_ratio = 4 [default=0.8];
+	optional float weight = 5 [default=1.0];
+	optional uint32 channel_out = 6 [default=4];
+	optional uint32 max_channel = 7 [default=60];
+}
+
+message DtowParameter {
+	enum DtowMethod{
+		MDTOW=0;
+		MWTOD=1;
+	}
+	optional DtowMethod method = 2 [default = MDTOW];
+	optional uint32 psize = 1 [default = 2];
 }
 
 // Message that stores parameters used to apply transformation
@@ -618,6 +703,11 @@ message ConvolutionParameter {
   // implementation; for input blobs with num_axes != 2, this option is
   // ignored and the ND implementation will be used.)
   optional bool force_nd_im2col = 17 [default = false];
+
+  // gan added
+  optional bool weight_fixed = 19 [default = false];
+  optional bool dis_mode = 20 [default = false];
+  optional bool gen_mode = 21 [default = false];
 }
 
 message CropParameter {
@@ -833,6 +923,11 @@ message InnerProductParameter {
   // of the weight matrix. The weight matrix itself is not going to be transposed
   // but rather the transfer flag of operations will be toggled accordingly.
   optional bool transpose = 6 [default = false];
+
+  // gan added
+  optional bool weight_fixed = 7 [default = false];
+  optional bool dis_mode = 8 [default = false];
+  optional bool gen_mode = 9 [default = false];
 }
 
 message InputParameter {
@@ -1105,6 +1200,10 @@ message ScaleParameter {
   // may be more efficient).  Initialized with bias_filler (defaults to 0).
   optional bool bias_term = 4 [default = false];
   optional FillerParameter bias_filler = 5;
+  
+  // gan added
+  optional bool dis_mode = 6 [default = false];
+  optional bool gen_mode = 7 [default = false];
 }
 
 message SigmoidParameter {
