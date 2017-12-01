@@ -5,7 +5,8 @@
 #include "caffe/layer_factory.hpp"
 #include "caffe/layers/scale_layer.hpp"
 #include "caffe/util/math_functions.hpp"
-
+// gan added
+#include "caffe/net.hpp"
 namespace caffe {
 
 template <typename Dtype>
@@ -147,6 +148,7 @@ void ScaleLayer<Dtype>::Backward_cpu(const vector<Blob<Dtype>*>& top,
     const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom) {
   // gan_added ---
   bool update_weight = true;
+  gan_mode_ = Net<Dtype>::get_gan_mode();
   if(this->layer_param_.scale_param().gen_mode() && gan_mode_ != 3) {
     update_weight = false;
   }
@@ -225,8 +227,6 @@ void ScaleLayer<Dtype>::Backward_cpu(const vector<Blob<Dtype>*>& top,
       }
     }
   }
-  // gan added --- update gan_mode_
-  gan_mode_ = gan_mode_ == 3 ? 1 : gan_mode_ + 1;
 }
 
 #ifdef CPU_ONLY

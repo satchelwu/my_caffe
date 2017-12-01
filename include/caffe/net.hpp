@@ -89,6 +89,138 @@ class Net {
     return loss;
   }
 
+  // gan added ---
+  // optimize D (2 steps)
+  // ## specifications:
+  // data blob top is data
+  // G: (bottom: data)layer[conv1] ==> layer[decode_data] (top: decode_data)
+  // gan_gate: bottom: 0_data 1_decode_data top: dis_input
+  // D: (bottom: dis_input)layer[dis_conv_d1] ==> layer[score] (top: score)
+
+  // gan_loss: score ==> sigmoid ==> gan_loss
+  // mse_loss: data, decode_data ==> mse_loss
+  // for D, mse loss is meaningless, so the returned loss is 2 phases' gan_loss sum
+  Dtype ForwardBackward_GAN_D(bool use_mse) {
+    Dtype loss;
+    Blob<Dtype> *gan_loss_blob;
+
+    int data = layer_names_index_["data"],
+        gate = layer_names_index_["gan_gate"];
+        // score = layer_names_index_["score"];
+    int gan_loss = layer_names_index_["gan_loss"];
+        // mse_loss = layer_names_index_["mse_loss"];
+      
+    // int end = layers_.size() - 1;
+    int Gstart = layer_names_index_["conv1"];
+
+    int rand_vec = -1;
+
+    // prepare input
+    if (!use_mse) {
+      rand_vec = layer_names_index_["rand_vec"];
+      ForwardFromTo(rand_vec, rand_vec);  // load new generate random vec
+      ForwardFromTo(data, data); // only gan_gate need data, data will not be splited
+    }
+    else {
+      ForwardFromTo(data, data+1); // get new data, +1 is for data split node
+    }
+        // Dstart = layer_names_index_["dis_conv_d1"];
+    
+
+    // LOG(INFO) << data << " , " << gate << " , " 
+    // << score << " , " << gan_loss << " , " 
+    // << mse_loss << " , " << end << std::endl;
+
+    // LOG(INFO) << "G_start" << Gstart << std::endl;
+    // LOG(INFO) << "D_start" << Dstart << std::endl;
+
+    
+    // LOG(INFO) << "(2)data input:" << blob_by_name("data")->asum_data() / blob_by_name("data")->count();
+
+    // D phase1 dis_input = data
+    ForwardFromTo(gate, gan_loss);
+    // Dtype output_loss = ForwardFromTo(gate, gan_loss);
+    // Dtype output_loss;
+    // Forward(&output_loss);
+    // LOG(INFO) << "(3)data input:" << blob_by_name("data")->asum_data();
+    gan_loss_blob = blob_by_name("gan_loss").get();
+    loss = (*gan_loss_blob->cpu_data()) * (*gan_loss_blob->cpu_diff());
+
+    // LOG(INFO) << "output_loss" << output_loss << std::endl;
+    // LOG(INFO) << "calc loss" << loss << std::endl;
+    BackwardFromTo(gan_loss, gate);
+    // Backward();
+    
+    // LOG(INFO) << "snk1" << std::endl;
+    // for (int i = 0; i < learnable_params_.size(); ++i) {
+    //   UpdateDebugInfo(i);
+    // }
+    
+  
+    switch_gan_mode();  // turn to phase 2
+
+    // D phase 2 dis_input = decode_data
+    ForwardFromTo(Gstart, gan_loss); // get decode data using G
+    
+    // Dtype tmp1 = ForwardFromTo(Gstart, gan_loss); // get decode data using G
+    // Dtype tmp1;
+    // Forward(&tmp1); // get decode data using G
+
+    // Dtype tmp2 = (*gan_loss_blob->cpu_data()) * (*gan_loss_blob->cpu_diff());
+    // loss += tmp2;
+    loss += (*gan_loss_blob->cpu_data()) * (*gan_loss_blob->cpu_diff());
+    // LOG(INFO) << "2 loss" << tmp1 << std::endl;
+    // LOG(INFO) << "2 loss (calc)" << tmp2 << std::endl;
+    BackwardFromTo(gan_loss, gate);
+    // Backward();
+
+
+    // LOG(INFO) << "snk2" << std::endl;
+    // for (int i = 0; i < learnable_params_.size(); ++i) {
+    //   UpdateDebugInfo(i);
+    // }
+    
+
+    switch_gan_mode(); // turn to mode G
+
+    // LOG(INFO) << "FB_GAN_D" << "loss" << loss << std::endl;
+    
+    return loss;
+  }
+
+
+  Dtype ForwardBackward_GAN_G(Dtype &gan_loss, Dtype &mse_loss, bool use_mse) {
+    Dtype tot_loss;
+    Blob<Dtype> *gan_loss_blob, *mse_loss_blob;
+    // int data = layer_names_index_["data"],
+        // gate = layer_names_index_["gan_gate"],
+        // score = layer_names_index_["score"];   
+    int end = layers_.size() - 1;
+    int Gstart = layer_names_index_["conv1"];
+        // Dstart = layer_names_index_["dis_conv_d1"];
+
+    tot_loss = ForwardFromTo(Gstart, end); // make sure G G, G is using updated weight to generate new pic 
+    // Forward(&tot_loss);
+    
+    gan_loss_blob = blob_by_name("gan_loss").get();
+    gan_loss = (*gan_loss_blob->cpu_data()) * (*gan_loss_blob->cpu_diff());
+    
+    if (use_mse) {
+      mse_loss_blob = blob_by_name("mse_loss").get();
+      mse_loss = (*mse_loss_blob->cpu_data()) * (*mse_loss_blob->cpu_diff());
+    }
+    
+    BackwardFromTo(end, Gstart);
+    // Backward();    
+    // LOG(INFO) << "FB_GAN_G" << "tot_loss" << tot_loss << std::endl;
+    // LOG(INFO) << "FB_GAN_G" << "gan_loss" << gan_loss << std::endl;
+    // LOG(INFO) << "FB_GAN_G" << "mse_loss" << mse_loss << std::endl;
+    
+    switch_gan_mode();
+    return tot_loss;
+  }
+  // ---
+
   /// @brief Updates the network weights based on the diff values computed.
   void Update();
   /**
@@ -252,6 +384,17 @@ class Net {
     after_backward_.push_back(value);
   }
 
+// gan added
+  static int gan_mode_;
+ 
+  inline static int get_gan_mode() {
+   return gan_mode_;
+  }
+  
+  inline static void switch_gan_mode() {
+    gan_mode_ = gan_mode_ == 3 ? 1 : gan_mode_ + 1;
+  } 
+
  protected:
   // Helpers for Init.
   /// @brief Append a new top blob to the net.
@@ -339,7 +482,7 @@ class Net {
 DISABLE_COPY_AND_ASSIGN(Net);
 };
 
-
+template <typename Dtype> int Net<Dtype>::gan_mode_ = 1; 
 }  // namespace caffe
 
 #endif  // CAFFE_NET_HPP_

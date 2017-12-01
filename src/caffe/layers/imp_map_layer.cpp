@@ -49,9 +49,9 @@ namespace caffe {
 			bound[i - 1] = one * i;
 		}
 		create_hash_table();
-		const int * hash = hash_.cpu_data();
-		for (int i = 0; i <= mod; i++)
-			LOG(INFO) << hash[i];
+		// const int * hash = hash_.cpu_data();
+		// for (int i = 0; i <= mod; i++)
+			// LOG(INFO) << hash[i];
 		
 	}
 	template <typename Dtype>

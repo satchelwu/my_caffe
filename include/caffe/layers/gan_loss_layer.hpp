@@ -49,9 +49,9 @@ class GANLossLayer : public LossLayer<Dtype> {
   virtual void Backward_cpu(const vector<Blob<Dtype>*>& top,
       const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom);
 
-  int dis_mod_;
-  int gen_mod_;
-  int iter_idx_;
+//   int dis_iter_;
+//   int gen_iter_;
+//   int iter_idx_;
 };
 
 template <typename Dtype>
@@ -78,11 +78,11 @@ class GANDGLossLayer : public LossLayer<Dtype> {
   virtual void Backward_cpu(const vector<Blob<Dtype>*>& top,
       const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom);
 
-  int dis_mod_;
-  int gen_mod_;
+//   int dis_iter_;
+//   int gen_iter_;
   int gan_mode_;
-  int diter_idx_;
-  int giter_idx_;
+//   int diter_idx_;
+//   int giter_idx_;
 };
 
 

@@ -109,6 +109,14 @@ class Solver {
   void DisplayOutputBlobs(const int net_id);
   void UpdateSmoothedLoss(Dtype loss, int start_iter, int average_loss);
 
+  // gan added
+  bool gan_solver_;
+  bool use_mse_;
+  int dis_mod_;
+  int gen_mod_;
+  int d_iters_;
+  int g_iters_;
+
   SolverParameter param_;
   int iter_;
   int current_step_;
@@ -128,6 +136,7 @@ class Solver {
   // Timing information, handy to tune e.g. nbr of GPUs
   Timer iteration_timer_;
   float iterations_last_;
+
 
   DISABLE_COPY_AND_ASSIGN(Solver);
 };

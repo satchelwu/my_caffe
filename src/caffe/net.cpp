@@ -523,6 +523,7 @@ Dtype Net<Dtype>::ForwardFromTo(int start, int end) {
     }
     Dtype layer_loss = layers_[i]->Forward(bottom_vecs_[i], top_vecs_[i]);
     loss += layer_loss;
+    // LOG(INFO) << "DEBUG_snk" << "loss" << loss << "layer_loss" << layer_loss << "@ layer" << i << std::endl;
     if (debug_info_) { ForwardDebugInfo(i); }
     for (int c = 0; c < after_forward_.size(); ++c) {
       after_forward_[c]->run(i);
@@ -906,6 +907,7 @@ void Net<Dtype>::ToHDF5(const string& filename, bool write_diff) const {
 template <typename Dtype>
 void Net<Dtype>::Update() {
   for (int i = 0; i < learnable_params_.size(); ++i) {
+    // UpdateDebugInfo(i);
     learnable_params_[i]->Update();
   }
 }

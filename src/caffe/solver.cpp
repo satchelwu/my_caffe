@@ -44,6 +44,15 @@ void Solver<Dtype>::Init(const SolverParameter& param) {
   LOG_IF(INFO, Caffe::root_solver()) << "Initializing solver from parameters: "
     << std::endl << param.DebugString();
   param_ = param;
+  // gan added --- 
+  gan_solver_ = param_.gan_solver();
+  use_mse_ = param_.use_mse_loss();
+  dis_mod_ = param_.dis_mod();
+  gen_mod_ = param_.gen_mod();
+  d_iters_ = g_iters_ = 0;
+
+  LOG_IF(INFO, Caffe::root_solver()) << "GAN mode enabled." << std::endl;
+  // --- 
   CHECK_GE(param_.average_loss(), 1) << "average_loss should be non-negative.";
   CheckSnapshotWritePermissions();
   if (param_.random_seed() >= 0) {
@@ -185,6 +194,8 @@ void Solver<Dtype>::Step(int iters) {
   smoothed_loss_ = 0;
   iteration_timer_.Start();
 
+  Dtype tot_loss, gan_loss, mse_loss;
+
   while (iter_ < stop_iter) {
     // zero-init the params
     net_->ClearParamDiffs();
@@ -206,8 +217,84 @@ void Solver<Dtype>::Step(int iters) {
     net_->set_debug_info(display && param_.debug_info());
     // accumulate the loss and gradient
     Dtype loss = 0;
-    for (int i = 0; i < param_.iter_size(); ++i) {
-      loss += net_->ForwardBackward();
+
+    if (gan_solver_)
+    {
+
+      if(Net<Dtype>::get_gan_mode() == 1)
+      {
+        if (d_iters_++ % dis_mod_ == 0)
+          tot_loss = net_->ForwardBackward_GAN_D(use_mse_) ;
+        else {
+          Net<Dtype>::switch_gan_mode(); // 1->2
+          Net<Dtype>::switch_gan_mode(); // 2->3
+          if (display) {
+            LOG_IF(INFO, Caffe::root_solver()) << "Iteration " << iter_;          
+            LOG_IF(INFO, Caffe::root_solver()) << "\t  train D  ... pass D      d_iters " << d_iters_ - 1
+            << "     dis_mod " << dis_mod_ << std::endl << std::endl;
+          }
+          iter_++;
+          continue;
+        }
+        // LOG_IF(INFO, Caffe::root_solver())
+        // << "1. GAN_MODE = " << Net<Dtype>::get_gan_mode() << std::endl;
+
+        // LOG_IF(INFO, Caffe::root_solver())
+        // << "1. SWITCH GAN_MODE" << std::endl;
+        // Net<Dtype>::switch_gan_mode();
+
+        //  LOG_IF(INFO, Caffe::root_solver())
+        // << "2. GAN_MODE = " << Net<Dtype>::get_gan_mode() << std::endl;
+
+        // LOG_IF(INFO, Caffe::root_solver())
+        // << "2. SWITCH GAN_MODE" << std::endl;
+        // Net<Dtype>::switch_gan_mode();
+
+        //   LOG_IF(INFO, Caffe::root_solver())
+        // << "3. GAN_MODE = " << Net<Dtype>::get_gan_mode() << std::endl;
+        // // optimize D (2 steps)
+        // // for D, loss is only gan_loss (cross entropy loss)
+        // mse_loss = net_->
+        //                                                        for (int i = 0; i < param_.iter_size(); ++i) {
+        //                                                         loss += net_->ForwardBackward();
+      }
+      else if(Net<Dtype>::get_gan_mode() == 3)
+      {
+        if (g_iters_++ % gen_mod_ == 0) {
+          tot_loss = net_->ForwardBackward_GAN_G(gan_loss, mse_loss, use_mse_);
+        }
+        else {
+          Net<Dtype>::switch_gan_mode(); // 3   
+          if (display) {     
+            LOG_IF(INFO, Caffe::root_solver()) << "Iteration " << iter_;
+            LOG_IF(INFO, Caffe::root_solver()) << "\t  train G  ... pass G      g_iters " << g_iters_ - 1
+            << "     gen_mod " << gen_mod_ << std::endl << std::endl;
+          }
+          iter_++;
+          continue;
+        }
+        // LOG(INFO) << "G gan_loss" << gan_loss << "mse_loss" << mse_loss << "tot_loss" << tot_loss << std::endl;
+        // optimize G
+        // for G, loss is weighted sum of mse loss and gan_loss
+        // LOG_IF(INFO, Caffe::root_solver())
+        // << "G GAN_MODE" << Net<Dtype>::get_gan_mode() << std::endl;
+        
+        // LOG_IF(INFO, Caffe::root_solver())
+        // << "G. SWITCH GAN_MODE" << std::endl;
+
+        // Net<Dtype>::switch_gan_mode();
+        // LOG_IF(INFO, Caffe::root_solver())
+        // << "After G GAN_MODE" << Net<Dtype>::get_gan_mode() << std::endl;
+        //                                                         for (int i = 0; i < param_.iter_size(); ++i) {
+        //                                                         loss += net_->ForwardBackward();
+        //                                                       }
+      }
+    }
+    else
+    {
+      for (int i = 0; i < param_.iter_size(); ++i) {
+        loss += net_->ForwardBackward();
+      }
     }
     loss /= param_.iter_size();
     // average the loss across iterations for smoothed reporting
@@ -215,28 +302,53 @@ void Solver<Dtype>::Step(int iters) {
     if (display) {
       float lapse = iteration_timer_.Seconds();
       float per_s = (iter_ - iterations_last_) / (lapse ? lapse : 1);
+      // gan added
+      if (!gan_solver_)
       LOG_IF(INFO, Caffe::root_solver()) << "Iteration " << iter_
           << " (" << per_s << " iter/s, " << lapse << "s/"
           << param_.display() << " iters), loss = " << smoothed_loss_;
       iteration_timer_.Start();
       iterations_last_ = iter_;
-      const vector<Blob<Dtype>*>& result = net_->output_blobs();
-      int score_index = 0;
-      for (int j = 0; j < result.size(); ++j) {
-        const Dtype* result_vec = result[j]->cpu_data();
-        const string& output_name =
-            net_->blob_names()[net_->output_blob_indices()[j]];
-        const Dtype loss_weight =
-            net_->blob_loss_weights()[net_->output_blob_indices()[j]];
-        for (int k = 0; k < result[j]->count(); ++k) {
-          ostringstream loss_msg_stream;
-          if (loss_weight) {
-            loss_msg_stream << " (* " << loss_weight
-                            << " = " << loss_weight * result_vec[k] << " loss)";
+
+      if (gan_solver_) {
+        // show train iter speed
+        LOG_IF(INFO, Caffe::root_solver()) << "Iteration " << iter_
+        << " (" << per_s << " iter/s, " << lapse << "s/"
+        << param_.display() << " iters)";
+
+        // has optimized D
+        if (Net<Dtype>::get_gan_mode() == 3) {
+          LOG_IF(INFO, Caffe::root_solver()) << "\t  train D  ... gan_loss = " << tot_loss / 2 << std::endl;  // divide 2 because real batch size is 2 times because of 2 phases of D training
+        }
+        // has optimized G
+        else if(Net<Dtype>::get_gan_mode() == 1) {
+          if (use_mse_)
+            LOG_IF(INFO, Caffe::root_solver()) << "\t  train G  ... tot loss = " << tot_loss << ",  gan_loss = " << gan_loss << ",  mse_loss = " << mse_loss << std::endl;  // divide 2 because real batch size is 2 times because of 2 phases of D training          
+          else
+            LOG_IF(INFO, Caffe::root_solver()) << "\t  train G  ... gan_loss = " << gan_loss << std::endl;  // divide 2 because real batch size is 2 times because of 2 phases of D training          
+        }
+        LOG_IF(INFO, Caffe::root_solver()) << std::endl; // for pretty output
+       
+      }
+      else {
+        const vector<Blob<Dtype>*>& result = net_->output_blobs();
+        int score_index = 0;
+        for (int j = 0; j < result.size(); ++j) {
+          const Dtype* result_vec = result[j]->cpu_data();
+          const string& output_name =
+              net_->blob_names()[net_->output_blob_indices()[j]];
+          const Dtype loss_weight =
+              net_->blob_loss_weights()[net_->output_blob_indices()[j]];
+          for (int k = 0; k < result[j]->count(); ++k) {
+            ostringstream loss_msg_stream;
+            if (loss_weight) {
+              loss_msg_stream << " (* " << loss_weight
+                              << " = " << loss_weight * result_vec[k] << " loss)";
+            }
+            LOG_IF(INFO, Caffe::root_solver()) << "    Train net output #"
+                << score_index++ << ": " << output_name << " = "
+                << result_vec[k] << loss_msg_stream.str();
           }
-          LOG_IF(INFO, Caffe::root_solver()) << "    Train net output #"
-              << score_index++ << ": " << output_name << " = "
-              << result_vec[k] << loss_msg_stream.str();
         }
       }
     }
@@ -306,8 +418,9 @@ void Solver<Dtype>::Solve(const char* resume_file) {
     net_->Forward(&loss);
 
     UpdateSmoothedLoss(loss, start_iter, average_loss);
-
-    LOG(INFO) << "Iteration " << iter_ << ", loss = " << smoothed_loss_;
+    // gan added
+    if (!gan_solver_)
+      LOG(INFO) << "Iteration " << iter_ << ", loss = " << smoothed_loss_;
   }
   if (param_.test_interval() && iter_ % param_.test_interval() == 0) {
     TestAll();

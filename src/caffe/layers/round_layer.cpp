@@ -17,6 +17,7 @@ namespace caffe {
 		mult = (rm.method() == RoundParameter_RoundMethod_MULTI);
 		this->blobs_.resize(1);
 		this->blobs_[0].reset(new Blob<Dtype>(1, 1, 1, 1));
+		this->blobs_[0]->mutable_cpu_data();   // it is important for syncedmem not initialized !!
 		if (mult){
 			groups = rm.groups();
 			hash_.Reshape(1, 1, 1, groups + 1);

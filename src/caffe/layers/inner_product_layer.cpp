@@ -3,7 +3,8 @@
 #include "caffe/filler.hpp"
 #include "caffe/layers/inner_product_layer.hpp"
 #include "caffe/util/math_functions.hpp"
-
+// gan added
+#include "caffe/net.hpp"
 namespace caffe {
 
 template <typename Dtype>
@@ -106,6 +107,7 @@ void InnerProductLayer<Dtype>::Backward_cpu(const vector<Blob<Dtype>*>& top,
     const Dtype* top_diff = top[0]->cpu_diff();
     const Dtype* bottom_data = bottom[0]->cpu_data();
     // gan_added ---
+    gan_mode_ = Net<Dtype>::get_gan_mode();
     if(this->layer_param_.inner_product_param().gen_mode() && gan_mode_ != 3) {
       update_weight_ = false;
     }
@@ -152,8 +154,6 @@ void InnerProductLayer<Dtype>::Backward_cpu(const vector<Blob<Dtype>*>& top,
           (Dtype)0., bottom[0]->mutable_cpu_diff());
     }
   }
-  // gan added --- update gan_mode_
-  gan_mode_ = gan_mode_ == 3 ? 1 : gan_mode_ + 1;
 }
 
 #ifdef CPU_ONLY

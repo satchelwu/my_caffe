@@ -244,6 +244,10 @@ message SolverParameter {
   
   // gan added
   optional bool gan_solver = 43 [default = false];
+  optional uint32 dis_mod = 44 [default = 1]; // every dis_mod iters train D once
+  optional uint32 gen_mod = 45 [default = 1];
+  optional bool use_mse_loss = 46 [default = false];
+  
 }
 
 // A message that stores the solver snapshots
@@ -311,7 +315,7 @@ message ParamSpec {
 // NOTE
 // Update the next available ID when you add a new LayerParameter field.
 //
-// LayerParameter next available layer-specific ID: 154 (last added: gan_loss_param)
+// LayerParameter next available layer-specific ID: 153 (last added: rand_vec_param)
 message LayerParameter {
   optional string name = 1; // the layer name
   optional string type = 2; // the layer type
@@ -411,7 +415,7 @@ message LayerParameter {
 
   // gan added
   optional RandVecParameter rand_vec_param = 152;
-  optional GANLossParameter gan_loss_param = 153; // used by GAN loss & GANDG loss
+  // optional GANLossParameter gan_loss_param = 153; // used by GAN loss & GANDG loss
 
   
   // compression CNN added
@@ -425,10 +429,10 @@ message LayerParameter {
 }
 
 // gan added
-message GANLossParameter {
-  optional uint32 dis_mod = 1 [default = 1];
-  optional uint32 gen_mod = 2 [default = 1];
-}
+// message GANLossParameter {
+//   optional uint32 dis_iter = 1 [default = 1];
+//   optional uint32 gen_iter = 2 [default = 1];
+// }
 
 message RandVecParameter {
   optional uint32 batch_size = 1 [default = 1]; // NCHW
@@ -708,6 +712,7 @@ message ConvolutionParameter {
   optional bool weight_fixed = 19 [default = false];
   optional bool dis_mode = 20 [default = false];
   optional bool gen_mode = 21 [default = false];
+  repeated uint32 shape_offset = 22;
 }
 
 message CropParameter {

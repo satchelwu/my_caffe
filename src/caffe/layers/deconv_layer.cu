@@ -1,6 +1,8 @@
 #include <vector>
 
 #include "caffe/layers/deconv_layer.hpp"
+// gan added
+#include "caffe/net.hpp"
 
 namespace caffe {
 
@@ -29,6 +31,7 @@ void DeconvolutionLayer<Dtype>::Backward_gpu(const vector<Blob<Dtype>*>& top,
   Dtype* weight_diff = this->blobs_[0]->mutable_gpu_diff();
   // gan added ---
   bool update_weight = !this->layer_param_.convolution_param().weight_fixed();
+  this->gan_mode_ = Net<Dtype>::get_gan_mode();
   if(this->layer_param_.convolution_param().gen_mode() && this->gan_mode_ != 3) {
     update_weight = false;
   }
@@ -63,8 +66,6 @@ void DeconvolutionLayer<Dtype>::Backward_gpu(const vector<Blob<Dtype>*>& top,
       }
     }
   }
-  // gan added --- update gan_mode_
-  this->gan_mode_ = this->gan_mode_ == 3 ? 1 : this->gan_mode_ + 1;
 }
 
 INSTANTIATE_LAYER_GPU_FUNCS(DeconvolutionLayer);
