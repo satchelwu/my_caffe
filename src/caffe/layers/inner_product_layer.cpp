@@ -107,6 +107,7 @@ void InnerProductLayer<Dtype>::Backward_cpu(const vector<Blob<Dtype>*>& top,
     const Dtype* top_diff = top[0]->cpu_diff();
     const Dtype* bottom_data = bottom[0]->cpu_data();
     // gan_added ---
+    update_weight_ = !this->layer_param_.inner_product_param().weight_fixed();
     gan_mode_ = Net<Dtype>::get_gan_mode();
     if(this->layer_param_.inner_product_param().gen_mode() && gan_mode_ != 3) {
       update_weight_ = false;
@@ -137,7 +138,7 @@ void InnerProductLayer<Dtype>::Backward_cpu(const vector<Blob<Dtype>*>& top,
     // Gradient with respect to bias
     caffe_cpu_gemv<Dtype>(CblasTrans, M_, N_, (Dtype)1., top_diff,
         bias_multiplier_.cpu_data(), (Dtype)1.,
-        this->blobs_[1]->mutable_cpu_diff());
+        this->blobs_[1]->mutable_cpu_diff()); // 叠加各个example内的对B的diff
   }
   if (propagate_down[0]) {
     const Dtype* top_diff = top[0]->cpu_diff();

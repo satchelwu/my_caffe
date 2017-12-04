@@ -49,7 +49,7 @@ void Solver<Dtype>::Init(const SolverParameter& param) {
   use_mse_ = param_.use_mse_loss();
   dis_mod_ = param_.dis_mod();
   gen_mod_ = param_.gen_mod();
-  d_iters_ = g_iters_ = 0;
+  d_iters_ = g_iters_ = 1;
 
   LOG_IF(INFO, Caffe::root_solver()) << "GAN mode enabled." << std::endl;
   // --- 
@@ -234,6 +234,9 @@ void Solver<Dtype>::Step(int iters) {
             << "     dis_mod " << dis_mod_ << std::endl << std::endl;
           }
           iter_++;
+          if (param_.snapshot() && iter_ % param_.snapshot() == 0 && Caffe::root_solver()) {
+            Snapshot();
+          }
           continue;
         }
         // LOG_IF(INFO, Caffe::root_solver())
@@ -271,6 +274,9 @@ void Solver<Dtype>::Step(int iters) {
             << "     gen_mod " << gen_mod_ << std::endl << std::endl;
           }
           iter_++;
+          if (param_.snapshot() && iter_ % param_.snapshot() == 0 && Caffe::root_solver()) {
+            Snapshot();
+          }
           continue;
         }
         // LOG(INFO) << "G gan_loss" << gan_loss << "mse_loss" << mse_loss << "tot_loss" << tot_loss << std::endl;

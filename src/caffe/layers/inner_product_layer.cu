@@ -40,6 +40,7 @@ void InnerProductLayer<Dtype>::Backward_gpu(const vector<Blob<Dtype>*>& top,
     const Dtype* top_diff = top[0]->gpu_diff();
     const Dtype* bottom_data = bottom[0]->gpu_data();
     // gan_added ---
+    update_weight_ = !this->layer_param_.inner_product_param().weight_fixed();
     gan_mode_ = Net<Dtype>::get_gan_mode();
     if(this->layer_param_.inner_product_param().gen_mode() && gan_mode_ != 3) {
       update_weight_ = false;

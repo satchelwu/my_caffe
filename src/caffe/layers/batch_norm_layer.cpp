@@ -178,7 +178,7 @@ void BatchNormLayer<Dtype>::Backward_cpu(const vector<Blob<Dtype>*>& top,
   }
   Dtype* bottom_diff = bottom[0]->mutable_cpu_diff();
   if (use_global_stats_) {
-    caffe_div(temp_.count(), top_diff, temp_.cpu_data(), bottom_diff);
+    caffe_div(temp_.count(), top_diff, temp_.cpu_data(), bottom_diff);  // because gama and beta are constant
     return;
   }
   const Dtype* top_data = x_norm_.cpu_data();

@@ -31,6 +31,13 @@ void SigmoidGANDGLossLayer<Dtype>::LayerSetUp(
       // giter_idx_ = 0;
       // dis_iter_ = this->layer_param_.gan_loss_param().dis_iter();
       // gen_iter_ = this->layer_param_.gan_loss_param().gen_iter();
+      this->blobs_.resize(4);  // 0~3 store acc  4 store gan_loss for D, gan_loss for G is easy
+      vector<int> acc_shape(0);
+      for (int i = 0; i < 4; i ++)
+      {
+        this->blobs_[i].reset(new Blob<Dtype>(acc_shape));
+        *this->blobs_[i]->mutable_cpu_data() = 0;
+      }
       gan_mode_ = 1;
 }
 
@@ -46,30 +53,48 @@ void SigmoidGANDGLossLayer<Dtype>::Forward_cpu(
   //loss is discriminative loss: -log(D(x))
   if (gan_mode_ == 1) {
     // diter_idx_++;
+    int correct = 0;
+    Dtype prob;
     for(int i = 0; i<batch_size; ++i) {
-      loss -= std::log(max(EPS, sigmoid(score[i])));
+      prob = sigmoid(score[i]);
+      loss -= std::log(max(EPS, prob));
+      if (prob > 0.5) correct++;
     }
-    
+    *this->blobs_[0]->mutable_cpu_data() = correct;
+    *this->blobs_[3]->mutable_cpu_data() = loss / static_cast<Dtype>(2 * batch_size);
   }
   //when gan_mode_ = 2, the input of loss is D(G(z))
   //loss is discriminative loss: -log(1-D(G(z)))
   if (gan_mode_ == 2){
+    int correct = 0;
+    Dtype prob;
     for(int i = 0; i<batch_size; ++i) {
-      loss -= std::log(max(EPS, 1 - sigmoid(score[i])));
+      prob = sigmoid(score[i]);
+      loss -= std::log(max(EPS, 1 - prob));
+      if (prob < 0.5) correct++;
     }
+    *this->blobs_[1]->mutable_cpu_data() = correct;
+    *this->blobs_[3]->mutable_cpu_data() += loss / static_cast<Dtype>(2 * batch_size);
   }
   //when gan_mode_ = 3, the input of loss is D(G(z))
   //loss is generative loss: -log(D(G(z)))
   if (gan_mode_ == 3){
     // giter_idx_++;
+    int correct = 0;
+    Dtype prob;
     for(int i = 0; i<batch_size; ++i) {
-      loss -= std::log(max(EPS, sigmoid(score[i])));
+      prob = sigmoid(score[i]);
+      loss -= std::log(max(EPS, prob));
+      if (prob < 0.5) correct++;
     }
+    *this->blobs_[2]->mutable_cpu_data() = correct;
+    *this->blobs_[3]->mutable_cpu_data() = loss / static_cast<Dtype>(batch_size);    
   }
   
   
   loss /= static_cast<Dtype>(batch_size);
   // LOG(INFO) << "loss of gandglosslayer" << loss << std::endl;
+  // LOG(INFO) << "gan_mode: " << gan_mode_ << std::endl;
   top[0]->mutable_cpu_data()[0] = loss;
 }
 
@@ -83,7 +108,7 @@ void SigmoidGANDGLossLayer<Dtype>::Backward_cpu(const vector<Blob<Dtype>*>& top,
   if (gan_mode_ == 1) {
     // if (diter_idx_ % dis_iter_ == 0 ) {
       for(int i = 0; i<batch_size; ++i) {
-        bottom[0]->mutable_cpu_diff()[i] = (bottom[0]->cpu_data()[i] - Dtype(1)) / static_cast<Dtype>(batch_size);
+        bottom[0]->mutable_cpu_diff()[i] = (sigmoid(bottom[0]->cpu_data()[i]) - Dtype(1)) / static_cast<Dtype>(batch_size);
           // LOG(INFO) << "gan_mode(1) bottom[0]->diff[" << i << "]=" << bottom[0]->mutable_cpu_diff()[i] << std::endl;
           // LOG(INFO) << "gan_mode(1) bottom[0]->data[" << i << "]=" << bottom[0]->cpu_data()[i] << std::endl;
       }
@@ -98,7 +123,7 @@ void SigmoidGANDGLossLayer<Dtype>::Backward_cpu(const vector<Blob<Dtype>*>& top,
   if (gan_mode_ == 2){
     // if (diter_idx_ % dis_iter_ == 0 ) {
       for(int i = 0; i<batch_size; ++i) {
-        bottom[0]->mutable_cpu_diff()[i] = bottom[0]->cpu_data()[i] / static_cast<Dtype>(batch_size);
+        bottom[0]->mutable_cpu_diff()[i] = sigmoid(bottom[0]->cpu_data()[i]) / static_cast<Dtype>(batch_size);
       }
     // } else {
     //   for (int i = 0; i<batch_size; ++i) {
@@ -111,7 +136,7 @@ void SigmoidGANDGLossLayer<Dtype>::Backward_cpu(const vector<Blob<Dtype>*>& top,
   if (gan_mode_ == 3){
     // if (giter_idx_ % gen_iter_ == 0 ) {
       for(int i = 0; i<batch_size; ++i) {
-        bottom[0]->mutable_cpu_diff()[i] = (bottom[0]->cpu_data()[i] - Dtype(1)) / static_cast<Dtype>(batch_size);
+        bottom[0]->mutable_cpu_diff()[i] = (sigmoid(bottom[0]->cpu_data()[i]) - Dtype(1)) / static_cast<Dtype>(batch_size);
       }
     // } else {
     //   for (int i = 0; i<batch_size; ++i) {

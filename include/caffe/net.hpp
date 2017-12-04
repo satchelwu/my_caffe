@@ -156,6 +156,7 @@ class Net {
     //   UpdateDebugInfo(i);
     // }
     
+
   
     switch_gan_mode();  // turn to phase 2
 
