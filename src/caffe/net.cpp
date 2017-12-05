@@ -911,6 +911,8 @@ void Net<Dtype>::Update() {
       UpdateDebugInfo(i);
     learnable_params_[i]->Update();
   }
+
+  // LOG(INFO) << "Update Done!" << std::endl;
 }
 
 template <typename Dtype>

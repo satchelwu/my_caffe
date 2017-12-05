@@ -114,9 +114,10 @@ class Solver {
   bool use_mse_;
   int dis_mod_;
   int gen_mod_;
-  int d_iters_;
+  int d_iters_;  // tot
   int g_iters_;
-
+  int d_work_iters_; // effective iters for Adam solver
+  int g_work_iters_;
   SolverParameter param_;
   int iter_;
   int current_step_;

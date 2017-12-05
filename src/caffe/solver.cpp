@@ -50,7 +50,7 @@ void Solver<Dtype>::Init(const SolverParameter& param) {
   dis_mod_ = param_.dis_mod();
   gen_mod_ = param_.gen_mod();
   d_iters_ = g_iters_ = 1;
-
+  d_work_iters_ = g_work_iters_ = 0;
   LOG_IF(INFO, Caffe::root_solver()) << "GAN mode enabled." << std::endl;
   // --- 
   CHECK_GE(param_.average_loss(), 1) << "average_loss should be non-negative.";
@@ -197,6 +197,7 @@ void Solver<Dtype>::Step(int iters) {
   Dtype tot_loss, gan_loss, mse_loss;
 
   while (iter_ < stop_iter) {
+    // LOG(INFO) << "start a new iter" << std::endl;
     // zero-init the params
     net_->ClearParamDiffs();
     if (param_.test_interval() && iter_ % param_.test_interval() == 0
@@ -223,8 +224,10 @@ void Solver<Dtype>::Step(int iters) {
 
       if(Net<Dtype>::get_gan_mode() == 1)
       {
-        if (d_iters_++ % dis_mod_ == 0)
+        if (d_iters_++ % dis_mod_ == 0) {
           tot_loss = net_->ForwardBackward_GAN_D(use_mse_) ;
+          // LOG(INFO) << "D " << tot_loss << std::endl;
+        }
         else {
           Net<Dtype>::switch_gan_mode(); // 1->2
           Net<Dtype>::switch_gan_mode(); // 2->3
@@ -265,6 +268,7 @@ void Solver<Dtype>::Step(int iters) {
       {
         if (g_iters_++ % gen_mod_ == 0) {
           tot_loss = net_->ForwardBackward_GAN_G(gan_loss, mse_loss, use_mse_);
+          // LOG(INFO) << "G " << tot_loss << " gan: " << gan_loss << std::endl;          
         }
         else {
           Net<Dtype>::switch_gan_mode(); // 3   
@@ -333,8 +337,7 @@ void Solver<Dtype>::Step(int iters) {
           else
             LOG_IF(INFO, Caffe::root_solver()) << "\t  train G  ... gan_loss = " << gan_loss << std::endl;  // divide 2 because real batch size is 2 times because of 2 phases of D training          
         }
-        LOG_IF(INFO, Caffe::root_solver()) << std::endl; // for pretty output
-       
+        LOG_IF(INFO, Caffe::root_solver()) << std::endl; // for pretty output     
       }
       else {
         const vector<Blob<Dtype>*>& result = net_->output_blobs();
@@ -361,8 +364,17 @@ void Solver<Dtype>::Step(int iters) {
     for (int i = 0; i < callbacks_.size(); ++i) {
       callbacks_[i]->on_gradients_ready();
     }
-    ApplyUpdate();
+    // used by Adam solver for GAN
+    if (gan_solver_) {
+      if (Net<Dtype>::get_gan_mode() == 1) {
+        g_work_iters_++;
+      } else if(Net<Dtype>::get_gan_mode() == 3) {
+        d_work_iters_++;
+      }
+    }
 
+    ApplyUpdate();
+    // LOG(INFO) << "ApplyUpdate() Done" << std::endl;
     // Increment the internal iter_ counter -- its value should always indicate
     // the number of times the weights have been updated.
     ++iter_;
@@ -381,7 +393,9 @@ void Solver<Dtype>::Step(int iters) {
       // Break out of training loop.
       break;
     }
+    // LOG(INFO) << "the iter end" << std::endl;
   }
+  // LOG(INFO) << "step() end" << std::endl;
 }
 
 template <typename Dtype>

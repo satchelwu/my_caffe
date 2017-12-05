@@ -313,6 +313,7 @@ void SGDSolver<Dtype>::RestoreSolverStateFromBinaryProto(
     this->net_->CopyTrainedLayersFrom(net_param);
   }
   this->current_step_ = state.current_step();
+  LOG(INFO) << "Restore From SolverState " << state.history_size() << ", " << history_.size() << std::endl;
   CHECK_EQ(state.history_size(), history_.size())
       << "Incorrect length of history blobs.";
   LOG(INFO) << "SGDSolver: restoring history";

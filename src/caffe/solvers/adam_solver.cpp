@@ -2,6 +2,9 @@
 
 #include "caffe/sgd_solvers.hpp"
 
+// gan added
+#include "caffe/net.hpp"
+
 namespace caffe {
 
 template <typename Dtype>
@@ -14,6 +17,24 @@ void AdamSolver<Dtype>::AdamPreSolve() {
     this->history_.push_back(
             shared_ptr<Blob<Dtype> >(new Blob<Dtype>(shape)));
   }
+
+	// gan added ---
+	if (this->gan_solver_) {
+		// history_size is twice than normal, the first part is for D and another part for G
+		// because for adam solver the history is twice than sgd, so the adam for GAN is 4 times of length to vanilla SGD solver.
+		// we dont use normalize() and regularize(), so we just modify the ComputeUpdateValue()
+		// the layout is below:
+		// m_D, v_D, m_G, v_G
+		// LOG(INFO) << "ALLOCATE MEMORY FOR GAN G HIST" << std::endl;
+		for (int _ = 0; _ < 2; ++_) {
+				for (int i = 0; i < net_params.size(); ++i) {
+						const vector<int>& shape = net_params[i]->shape();
+						this->history_.push_back(
+										shared_ptr<Blob<Dtype> >(new Blob<Dtype>(shape)));
+				}
+		}
+	}
+  // ---
 }
 
 #ifndef CPU_ONLY
@@ -24,7 +45,8 @@ void adam_update_gpu(int N, Dtype* g, Dtype* m, Dtype* v, Dtype beta1,
 
 template <typename Dtype>
 void AdamSolver<Dtype>::ComputeUpdateValue(int param_id, Dtype rate) {
-  const vector<Blob<Dtype>*>& net_params = this->net_->learnable_params();
+	// LOG(INFO) << "Adam Compute Update Value" << std::endl;
+	const vector<Blob<Dtype>*>& net_params = this->net_->learnable_params();
   const vector<float>& net_params_lr = this->net_->params_lr();
   Dtype local_rate = rate * net_params_lr[param_id];
   const Dtype beta1 = this->param_.momentum();
@@ -32,17 +54,38 @@ void AdamSolver<Dtype>::ComputeUpdateValue(int param_id, Dtype rate) {
 
   // we create aliases for convenience
   size_t update_history_offset = net_params.size();
+
+
   Blob<Dtype>* val_m = this->history_[param_id].get();
   Blob<Dtype>* val_v = this->history_[param_id + update_history_offset].get();
   Blob<Dtype>* val_t = this->temp_[param_id].get();
 
-  const int t = this->iter_ + 1;
+
+  // gan added
+  // for G, after switch the gan_mode should be 1
+  if (this->gan_solver_ && Net<Dtype>::get_gan_mode() == 1) {
+    
+			// val_m = val_m + update_history_offset * 2;  kernel error causing restarting kernel
+			// val_v = val_v + update_history_offset * 2;
+      val_m = this->history_[param_id + update_history_offset * 2].get();
+      val_v = this->history_[param_id + update_history_offset * 3].get();
+  }
+ 
+  int t = this->iter_ + 1;
+	if (this->gan_solver_) {
+		if (Net<Dtype>::get_gan_mode() == 1) {
+			t = this->g_work_iters_;
+		}
+		else if (Net<Dtype>::get_gan_mode() == 3) {
+			t = this->d_work_iters_;
+		}
+	}
   const Dtype correction = std::sqrt(Dtype(1) - pow(beta2, t)) /
       (Dtype(1.) - pow(beta1, t));
   const int N = net_params[param_id]->count();
   const Dtype eps_hat = this->param_.delta();
 
-  switch (Caffe::mode()) {
+	switch (Caffe::mode()) {
     case Caffe::CPU: {
     // update m <- \beta_1 m_{t-1} + (1-\beta_1)g_t
     caffe_cpu_axpby(N, Dtype(1)-beta1,
@@ -50,7 +93,7 @@ void AdamSolver<Dtype>::ComputeUpdateValue(int param_id, Dtype rate) {
         val_m->mutable_cpu_data());
 
     // update v <- \beta_2 m_{t-1} + (1-\beta_2)g_t^2
-    caffe_mul(N,
+		caffe_mul(N,
         net_params[param_id]->cpu_diff(),
         net_params[param_id]->cpu_diff(),
     val_t->mutable_cpu_data());
