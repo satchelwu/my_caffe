@@ -77,6 +77,52 @@ void SGDSolver<Dtype>::PreSolve() {
   }
 }
 
+
+//wgan added
+
+#ifndef CPU_ONLY
+template <typename Dtype>
+void clip_weight_gpu(int N, Dtype* g, Dtype clip_weights);
+#endif
+
+template <typename Dtype>
+void SGDSolver<Dtype>::ClipWeights() {
+  const bool need_clip = this->gan_solver_ && this->wgan_mode_ && Net<Dtype>::get_gan_mode() == 3;  // gan_mode = 3 means just calc the gradients wrt D, we only need to clip D params
+  if (need_clip == false) return;
+  const Dtype clip_weights = this->clip_weights_;
+  const vector<Blob<Dtype>*>& net_params = this->net_->learnable_params();
+  int d_params_start = this->net_->learnable_param_ids().at(this->net_->param_names_index().at("dis_w_1"));
+  // LOG(INFO) << "net_params_id" << this->net_->param_names_index().at("dis_w_1") << std::endl;
+  // LOG(INFO) << "learnable_params_id" << d_params_start << std::endl;
+  for (int i = d_params_start; i < net_params.size(); ++i) {
+    Blob<Dtype> *param = net_params[i];
+    switch (Caffe::mode()) {
+      case Caffe::CPU: {
+        Dtype *param_cpu_data = param->mutable_cpu_data();
+        for (int j = 0; j < param->count(); ++j) {
+          if (param_cpu_data[j] > clip_weights) {
+            param_cpu_data[j] = clip_weights;
+          } else if(param_cpu_data[j] < -clip_weights) {
+            param_cpu_data[j] = -clip_weights;
+          }
+        }
+        break;
+      }
+      case Caffe::GPU: {
+        #ifndef CPU_ONLY
+          clip_weight_gpu(param->count(), param->mutable_gpu_data(), clip_weights);
+        #else
+          NO_GPU;
+        #endif
+          break;
+      }
+      default:
+        LOG(FATAL) << "Unknown caffe mode: " << Caffe::mode();
+    }
+  }
+}
+
+
 template <typename Dtype>
 void SGDSolver<Dtype>::ClipGradients() {
   const Dtype clip_gradients = this->param_.clip_gradients();
@@ -113,6 +159,7 @@ void SGDSolver<Dtype>::ApplyUpdate() {
     ComputeUpdateValue(param_id, rate);
   }
   this->net_->Update();
+  ClipWeights();
 }
 
 template <typename Dtype>
@@ -208,6 +255,7 @@ template <typename Dtype>
 void sgd_update_gpu(int N, Dtype* g, Dtype* h, Dtype momentum,
     Dtype local_rate);
 #endif
+
 
 template <typename Dtype>
 void SGDSolver<Dtype>::ComputeUpdateValue(int param_id, Dtype rate) {

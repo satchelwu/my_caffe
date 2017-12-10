@@ -248,6 +248,13 @@ message SolverParameter {
   optional uint32 gen_mod = 45 [default = 1];
   optional bool use_mse_loss = 46 [default = false];
   
+
+  // wgan added (weight clipping)
+  optional bool wgan_mode = 47 [default = false]; // must set gan_solver = true before setting wgan_mode = true
+  optional float clip_weights = 48 [default = 0.01];
+  optional uint32 first_iter = 49 [default = 25];
+  optional uint32 train_more_interval = 50 [default = 500];
+  optional uint32 train_more_iters = 51 [default = 100];
 }
 
 // A message that stores the solver snapshots

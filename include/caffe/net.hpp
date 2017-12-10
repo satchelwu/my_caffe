@@ -394,8 +394,13 @@ class Net {
   
   inline static void switch_gan_mode() {
     gan_mode_ = gan_mode_ == 3 ? 1 : gan_mode_ + 1;
-  } 
+  }
 
+// wgan added
+  const vector<int>& learnable_param_ids() const {
+    return learnable_param_ids_;
+  }
+  
  protected:
   // Helpers for Init.
   /// @brief Append a new top blob to the net.

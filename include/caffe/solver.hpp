@@ -118,6 +118,15 @@ class Solver {
   int g_iters_;
   int d_work_iters_; // effective iters for Adam solver
   int g_work_iters_;
+
+  // wgan added
+  bool wgan_mode_;
+  Dtype clip_weights_;
+  int first_iter_;
+  int train_more_interval_;
+  int train_more_iters_;
+
+  
   SolverParameter param_;
   int iter_;
   int current_step_;

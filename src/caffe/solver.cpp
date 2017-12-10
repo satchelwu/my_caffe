@@ -51,7 +51,29 @@ void Solver<Dtype>::Init(const SolverParameter& param) {
   gen_mod_ = param_.gen_mod();
   d_iters_ = g_iters_ = 1;
   d_work_iters_ = g_work_iters_ = 0;
-  LOG_IF(INFO, Caffe::root_solver()) << "GAN mode enabled." << std::endl;
+  // wgan added ---
+  wgan_mode_ = param_.wgan_mode();
+  clip_weights_ = param.clip_weights();
+  first_iter_ = param.first_iter();
+  train_more_interval_ = param.train_more_interval();
+  train_more_iters_ = param.train_more_iters();
+
+
+  if (gan_solver_) {
+    LOG_IF(INFO, Caffe::root_solver()) << "GAN mode enabled." << std::endl;
+    if (wgan_mode_) {
+      LOG_IF(INFO, Caffe::root_solver()) << "WGAN mode enabled." << std::endl;  
+    }
+  } else {
+    if (wgan_mode_) {
+      LOG_IF(ERROR, Caffe::root_solver()) << "WGAN mode enabled without enabling gan solver mode!" << std::endl;        
+    }
+  }
+
+  if (use_mse_) {
+    LOG_IF(INFO, Caffe::root_solver()) << "Use mse loss enabled." << std::endl;    
+  }
+
   // --- 
   CHECK_GE(param_.average_loss(), 1) << "average_loss should be non-negative.";
   CheckSnapshotWritePermissions();
@@ -197,6 +219,13 @@ void Solver<Dtype>::Step(int iters) {
   Dtype tot_loss, gan_loss, mse_loss;
 
   while (iter_ < stop_iter) {
+
+    if (g_work_iters_ < first_iter_ || g_work_iters_ % train_more_interval_ == 0) {
+      gen_mod_ = train_more_iters_;
+    }
+    else {
+      gen_mod_ = param_.gen_mod();
+    }
     // LOG(INFO) << "start a new iter" << std::endl;
     // zero-init the params
     net_->ClearParamDiffs();

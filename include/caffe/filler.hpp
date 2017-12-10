@@ -157,7 +157,8 @@ class XavierFiller : public Filler<Dtype> {
         FillerParameter_VarianceNorm_FAN_OUT) {
       n = fan_out;
     }
-    Dtype scale = sqrt(Dtype(3) / n);
+    // Dtype scale = sqrt(Dtype(3) / n);
+    Dtype scale = Dtype(1) / sqrt(n);    // to compatible with pytorch
     caffe_rng_uniform<Dtype>(blob->count(), -scale, scale,
         blob->mutable_cpu_data());
     CHECK_EQ(this->filler_param_.sparse(), -1)

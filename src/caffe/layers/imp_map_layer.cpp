@@ -16,8 +16,6 @@ namespace caffe {
 		weight_ = rm.weight();
 		ratio_ = rm.cmp_ratio();
 		ngroup_ = rm.groups();
-		this->blobs_.resize(1);
-		this->blobs_[0].reset(new Blob<Dtype>(1, 1, 1, 1));
 		channel_out_ = rm.channel_out();
 		max_channel_ = rm.max_channel();
 		lquantize_ = rm.lquantize();
